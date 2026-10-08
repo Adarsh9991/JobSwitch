@@ -9,6 +9,8 @@ const today = () => new Date().toISOString().slice(0, 10);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = d => d ? new Date(d + 'T00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 const $ = id => document.getElementById(id);
+const now = () => Date.now();
+const TYPES = ['apps', 'resumes', 'goals', 'prep'];
 
 /* ---------- data ---------- */
 function seed() {
@@ -23,10 +25,10 @@ function seed() {
     ['Decide your salary range and notice-period answer', 'Logistics'],
     ['Prepare 5 questions to ask the interviewer', 'Company research']
   ];
-  return { apps: [], resumes: [], goals: [], prep: items.map(([title, cat]) => ({ id: uid(), title, cat, done: false, notes: '' })) };
+  return { apps: [], resumes: [], goals: [], del: {}, prep: items.map(([title, cat], i) => ({ id: 'seed' + i, title, cat, done: false, notes: '', u: 0 })) };
 }
 function load() {
-  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.apps) return d; } catch (e) {}
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.apps) { d.del = d.del || {}; return d; } } catch (e) {}
   return seed();
 }
 let db = load();
@@ -97,7 +99,7 @@ function openForm(type, id) {
       const v = $('form').elements[f.k].value.trim();
       data[f.k] = f.t === 'range' ? Number(v) : v;
     });
-    if (item) Object.assign(item, data); else db[type].push({ id: uid(), ...(type === 'prep' ? { done: false } : {}), ...data });
+    if (item) Object.assign(item, data, { u: now() }); else db[type].push({ id: uid(), ...(type === 'prep' ? { done: false } : {}), ...data, u: now() });
     save(); render(); $('dlg').close();
   };
   $('dlg').showModal();
@@ -226,37 +228,99 @@ document.addEventListener('click', e => {
   if (act === 'edit') openForm(type, id);
   if (act === 'chip') { filter.status = b.dataset.v; renderApps(); }
   if (act === 'del' && confirm(`Delete this ${schemas[type].name}?`)) {
-    db[type] = db[type].filter(x => x.id !== id);
-    if (type === 'resumes') db.apps.forEach(a => { if (a.resume === id) a.resume = ''; });
+    db[type] = db[type].filter(x => x.id !== id); db.del[id] = now();
+    if (type === 'resumes') db.apps.forEach(a => { if (a.resume === id) { a.resume = ''; a.u = now(); } });
     save(); render();
   }
 });
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.dataset.status) { db.apps.find(a => a.id === t.dataset.status).status = t.value; save(); render(); }
-  if (t.dataset.done) { const p = db.prep.find(x => x.id === t.dataset.done); p.done = t.checked; save(); render(); }
-  if (t.dataset.prog) { db.goals.find(g => g.id === t.dataset.prog).progress = Number(t.value); save(); render(); }
+  if (t.dataset.status) { const a = db.apps.find(x => x.id === t.dataset.status); a.status = t.value; a.u = now(); save(); render(); }
+  if (t.dataset.done) { const p = db.prep.find(x => x.id === t.dataset.done); p.done = t.checked; p.u = now(); save(); render(); }
+  if (t.dataset.prog) { const g = db.goals.find(x => x.id === t.dataset.prog); g.progress = Number(t.value); g.u = now(); save(); render(); }
 });
 
-/* ---------- backup ---------- */
-$('export').onclick = () => {
+/* ---------- backup and sync ---------- */
+const isEmpty = d => !d.apps.length && !d.resumes.length && !d.goals.length && d.prep.every(p => !p.done && !p.u);
+
+function mergeIn(inc) {
+  const del = { ...db.del };
+  for (const [k, v] of Object.entries(inc.del || {})) del[k] = Math.max(del[k] || 0, v);
+  const out = { del };
+  for (const t of TYPES) {
+    const m = new Map();
+    const keyOf = it => t === 'prep' && !it.u ? 't:' + it.cat + '|' + String(it.title || '').toLowerCase() : it.id;
+    for (const it of [...db[t], ...inc[t]]) {
+      const k = keyOf(it), cur = m.get(k);
+      if (!cur || (it.u || 0) >= (cur.u || 0)) m.set(k, it);
+    }
+    out[t] = [...m.values()].filter(it => !(del[it.id] > (it.u || 0)));
+  }
+  return out;
+}
+
+function applyIncoming(inc) {
+  if (!inc || !TYPES.every(k => Array.isArray(inc[k]))) { toast('That is not a valid backup.'); return; }
+  inc.del = inc.del || {};
+  if (isEmpty(db)) { db = inc; save(); render(); toast('Data loaded on this device'); return; }
+  $('form').innerHTML = `<h3>Bring in data from another device</h3>
+    <p>Merge keeps everything from both devices and uses the newer version of anything edited on both. Replace swaps this device's data for the incoming data.</p>
+    <div class="row"><button type="button" class="btn plain" id="cancel">Cancel</button><button type="button" class="btn plain" id="rep">Replace</button><button type="button" class="btn" id="mer">Merge</button></div>`;
+  $('cancel').onclick = () => $('dlg').close();
+  $('rep').onclick = () => { db = inc; save(); render(); $('dlg').close(); toast('Data replaced'); };
+  $('mer').onclick = () => { db = mergeIn(inc); save(); render(); $('dlg').close(); toast('Data merged'); };
+  $('dlg').showModal();
+}
+
+$('export').onclick = async () => {
+  const name = `job-tracker-backup-${today()}.json`;
+  const file = new File([JSON.stringify(db, null, 2)], name, { type: 'application/json' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: 'Job tracker backup' }); return; }
+    catch (e) { if (e.name === 'AbortError') return; }
+  }
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' }));
-  a.download = `job-tracker-backup-${today()}.json`; a.click(); URL.revokeObjectURL(a.href);
+  a.href = URL.createObjectURL(file); a.download = name; a.click(); URL.revokeObjectURL(a.href);
 };
 $('import').onclick = () => $('file').click();
 $('file').onchange = e => {
   const f = e.target.files[0]; if (!f) return;
   const r = new FileReader();
-  r.onload = () => {
-    try {
-      const d = JSON.parse(r.result);
-      if (!['apps', 'resumes', 'goals', 'prep'].every(k => Array.isArray(d[k]))) throw 0;
-      if (!confirm('Replace everything in this browser with the backup?')) return;
-      db = d; save(); render(); toast('Backup imported');
-    } catch (err) { toast('That file is not a valid backup.'); }
-  };
+  r.onload = () => { try { applyIncoming(JSON.parse(r.result)); } catch (err) { toast('That file is not a valid backup.'); } };
   r.readAsText(f); e.target.value = '';
 };
 
-render(); show();
+/* sync link: the whole data set, compressed, in the URL hash (never sent to a server) */
+async function pack(str) {
+  const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'));
+  const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+  let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function unpack(b64) {
+  const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+  const stream = new Blob([Uint8Array.from(bin, c => c.charCodeAt(0))]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Response(stream).text();
+}
+$('link').onclick = async () => {
+  if (!window.CompressionStream) { toast('Your browser cannot make sync links. Use Export backup instead.'); return; }
+  const url = location.origin + location.pathname + '#sync=' + await pack(JSON.stringify(db));
+  try { await navigator.clipboard.writeText(url); toast('Sync link copied. Open it on your other device.'); }
+  catch (e) { prompt('Copy this link and open it on your other device:', url); }
+};
+
+/* ---------- install and offline ---------- */
+let deferredInstall;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; $('install').hidden = false; });
+$('install').onclick = async () => { if (!deferredInstall) return; deferredInstall.prompt(); await deferredInstall.userChoice; deferredInstall = null; $('install').hidden = true; };
+window.addEventListener('appinstalled', () => { $('install').hidden = true; });
+if (/iphone|ipad/i.test(navigator.userAgent) && !navigator.standalone) $('iosHint').hidden = false;
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+
+/* ---------- start ---------- */
+render();
+const sm = location.hash.match(/^#sync=(.+)$/);
+if (sm) history.replaceState(null, '', location.pathname + location.search);
+show();
+if (sm) unpack(sm[1]).then(t => applyIncoming(JSON.parse(t))).catch(() => toast('That sync link could not be read.'));
