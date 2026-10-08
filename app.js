@@ -150,13 +150,13 @@ function appRows() {
   const rows = db.apps
     .filter(a => (filter.status === 'All' || a.status === filter.status) && (a.company + ' ' + a.role).toLowerCase().includes(q))
     .sort((a, b) => (b.applied || '').localeCompare(a.applied || ''));
-  if (!rows.length) return `<tr><td colspan="6" class="muted">${db.apps.length ? 'No applications match this filter.' : 'No applications yet. Use "Add application" to start tracking.'}</td></tr>`;
+  if (!rows.length) return `<tr><td colspan="6" class="muted nomatch">${db.apps.length ? 'No applications match this filter.' : 'No applications yet. Use "Add application" to start tracking.'}</td></tr>`;
   return rows.map(a => `<tr>
     <td><b>${esc(a.company)}</b><small>${esc(a.role)}${a.link ? ` · <a href="${esc(a.link)}" target="_blank" rel="noopener">posting</a>` : ''}</small>${a.notes ? `<small>${esc(a.notes)}</small>` : ''}</td>
-    <td><select data-status="${a.id}" aria-label="Status">${STATUSES.map(s => `<option${s === a.status ? ' selected' : ''}>${s}</option>`).join('')}</select></td>
-    <td>${fmt(a.applied)}</td>
-    <td>${esc(resumeName(a.resume) || '—')}</td>
-    <td class="${a.followup && a.followup <= today() && ACTIVE.includes(a.status) ? 'due' : ''}">${fmt(a.followup)}</td>
+    <td data-label="Status"><select data-status="${a.id}" aria-label="Status">${STATUSES.map(s => `<option${s === a.status ? ' selected' : ''}>${s}</option>`).join('')}</select></td>
+    <td data-label="Applied">${fmt(a.applied)}</td>
+    <td data-label="Resume">${esc(resumeName(a.resume) || '—')}</td>
+    <td data-label="Follow up" class="${a.followup && a.followup <= today() && ACTIVE.includes(a.status) ? 'due' : ''}">${fmt(a.followup)}</td>
     <td>${acts('apps', a.id)}</td></tr>`).join('');
 }
 function renderApps() {
