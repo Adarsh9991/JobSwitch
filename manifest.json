@@ -1,0 +1,15 @@
+{
+  "name": "Job Switch Tracker",
+  "short_name": "Job Switch",
+  "description": "Track job applications, resumes, learning goals and interview prep.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#E9EEF0",
+  "theme_color": "#14222C",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
