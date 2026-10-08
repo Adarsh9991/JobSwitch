@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Switch Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<aside class="side">
+  <h1>Job switch</h1>
+  <nav id="nav">
+    <button data-view="dash">Dashboard</button>
+    <button data-view="apps">Applications</button>
+    <button data-view="resumes">Resumes</button>
+    <button data-view="goals">Learning goals</button>
+    <button data-view="prep">Interview prep</button>
+  </nav>
+  <div class="backup">
+    <button id="export" class="ghost">Export backup</button>
+    <button id="import" class="ghost">Import backup</button>
+    <input type="file" id="file" accept="application/json" hidden>
+    <p>Data lives in this browser only. Export now and then.</p>
+  </div>
+</aside>
+
+<main>
+  <section id="v-dash" class="view"></section>
+  <section id="v-apps" class="view" hidden></section>
+  <section id="v-resumes" class="view" hidden></section>
+  <section id="v-goals" class="view" hidden></section>
+  <section id="v-prep" class="view" hidden></section>
+</main>
+
+<dialog id="dlg"><form id="form"></form></dialog>
+<div id="toast" role="status"></div>
+<script src="app.js"></script>
+</body>
+</html>
