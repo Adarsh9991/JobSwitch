@@ -25,6 +25,7 @@ a{color:var(--accent)}
 .backup p{margin:4px 0 0;font-size:.8rem;color:#8FA2AC}
 .ghost{background:none;border:1px solid #3B4E5A;color:#E4ECF0;border-radius:6px;padding:7px 10px;cursor:pointer}
 .ghost:hover{background:#22333F}
+#form p{margin:0;color:var(--muted)}
 
 main{padding:36px clamp(16px,4vw,48px);max-width:1100px;width:100%}
 .head{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px;flex-wrap:wrap}
@@ -102,6 +103,7 @@ dialog::backdrop{background:rgba(20,34,44,.5)}
   main{order:1;padding:14px 16px 8px}
   .backup{order:2;flex-direction:row;flex-wrap:wrap;margin-top:0;padding:8px 16px 16px}
   .backup p{display:none}
+  .backup p.hint:not([hidden]){display:block;color:var(--muted);font-size:.85rem;width:100%}
   .ghost{color:var(--ink);border-color:var(--line);background:var(--surface)}
   .ghost:hover{background:var(--surface)}
 
